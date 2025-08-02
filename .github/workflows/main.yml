@@ -98,10 +98,9 @@ jobs:
 
       - name: Build Admin Image
         run: |
-          docker build -t admin:latest ./apps/admin \
+          docker build -t my-nginx:latest ./apps/admin \
             -f ./apps/admin/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
-            --build-arg NEXT_PUBLIC_REFRESH_TOKEN_URL=$NEXT_PUBLIC_REFRESH_TOKEN_URL
+            --build-arg MY_DUMMY_ARG=$NEXT_PUBLIC_API_BASE_URL
 
       - name: Build Supplier Image
         run: |
