@@ -1,0 +1,128 @@
+name: DeployAWS
+
+run-name: a ${{ github.event.inputs.environment }} deployment has started
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        description: "Environment [qa | staging | demo | production | evercore-sandbox]"
+        type: choice
+        options:
+          - qa
+          - staging
+          - demo
+          - production
+          - evercore-sandbox
+        default: "qa"
+
+env:
+  # AWS_REGION: us-east-1
+  # DEV_ECS_CLUSTER: tangible-dev-cluster
+  # PRODUCTION_ECS_CLUSTER: tangible-production-cluster
+  # CONTAINER_NAME: auctions-admin
+
+  # NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+  # NEXT_PUBLIC_REFRESH_TOKEN_URL: ${{ vars.NEXT_PUBLIC_REFRESH_TOKEN_URL }}
+  # NEXT_PUBLIC_SUPPLIER_URL: ${{ vars.NEXT_PUBLIC_SUPPLIER_URL }}
+  # NEXT_PUBLIC_CUSTOMER_URL: ${{ vars.NEXT_PUBLIC_CUSTOMER_URL }}
+  # NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+  # NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
+  # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+
+  NEXT_PUBLIC_API_BASE_URL: "empty-value"
+  NEXT_PUBLIC_REFRESH_TOKEN_URL: "empty-value"
+  NEXT_PUBLIC_SUPPLIER_URL: "empty-value"
+  NEXT_PUBLIC_CUSTOMER_URL: "empty-value"
+  NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "empty-value"
+  NEXT_PUBLIC_STRIPE_PUBLIC_KEY: "empty-value"
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "empty-value"
+
+permissions:
+  contents: read
+
+jobs:
+
+  # set-vars:
+  #   name: Set Variables
+
+  #   runs-on: ubuntu-24.04
+
+  #   outputs:
+  #     ENVIRONMENT: ${{ steps.set-vars.outputs.ENVIRONMENT }}
+  #     SERVICE_NAME: ${{ steps.set-vars.outputs.SERVICE_NAME }}
+  #     CLUSTER_NAME: ${{ steps.set-vars.outputs.CLUSTER_NAME }}
+  #     DOCKER_IMAGE: ${{ steps.set-vars.outputs.DOCKER_IMAGE }}
+
+  #   steps:
+
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+
+  #     - name: Set Variables
+  #       id: set-vars
+  #       run: |
+  #         ENVIRONMENT=${{ github.event.inputs.environment }}
+  #         IMAGE_TAG=$(git rev-parse --short HEAD)
+  #         DOCKER_IMAGE=${{ env.DOCKER_REPO_NAME }}:$IMAGE_TAG
+  #         SERVICE_NAME=${{ env.CONTAINER_NAME }}-$ENVIRONMENT
+
+  #         case "$ENVIRONMENT" in
+  #           production|demo|evercore-sandbox)
+  #             CLUSTER_NAME=${{ env.PRODUCTION_ECS_CLUSTER }}
+  #             ;;
+  #           *)
+  #             CLUSTER_NAME=${{ env.DEV_ECS_CLUSTER }}
+  #             ;;
+  #         esac
+
+  #         echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
+  #         echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+  #         echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
+  #         echo "DOCKER_IMAGE=$DOCKER_IMAGE" >> $GITHUB_OUTPUT
+
+  build-apps:
+    name: Build All App Images
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Admin Image
+        run: |
+          docker build -t admin:latest ./apps/admin \
+            -f ./apps/admin/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+            --build-arg NEXT_PUBLIC_REFRESH_TOKEN_URL=$NEXT_PUBLIC_REFRESH_TOKEN_URL
+
+      - name: Build Supplier Image
+        run: |
+          docker build -t supplier:latest ./apps/supplier \
+            -f ./apps/supplier/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+            --build-arg NEXT_PUBLIC_REFRESH_TOKEN_URL=$NEXT_PUBLIC_REFRESH_TOKEN_URL \
+            --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY \
+            --build-arg NEXT_PUBLIC_CUSTOMER_URL=$NEXT_PUBLIC_CUSTOMER_URL \
+            --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY=$NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+
+      - name: Build Customer Image
+        run: |
+          docker build -t customer:latest ./apps/customer \
+            -f ./apps/customer/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+            --build-arg NEXT_PUBLIC_REFRESH_TOKEN_URL=$NEXT_PUBLIC_REFRESH_TOKEN_URL \
+            --build-arg NEXT_PUBLIC_STRIPE_PUBLIC_KEY=$NEXT_PUBLIC_STRIPE_PUBLIC_KEY \
+            --build-arg NEXT_PUBLIC_SUPPLIER_URL=$NEXT_PUBLIC_SUPPLIER_URL
+
+      - name: Build API Image
+        run: |
+          docker build -t api:latest ./apps/api \
+            -f ./apps/api/Dockerfile
